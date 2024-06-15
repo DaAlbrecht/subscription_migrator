@@ -1,0 +1,12 @@
+<applications>
+    <application name="foo" tokenType="application" tokenValidity="1">
+        <subscription apiName="hello" apiVersion="1.0.0" environment="dev" tenantId="foo-bar" />
+        <subscription apiName="world" apiVersion="1.0.0" environment="dev" tenantId="foo-bar" />
+        <subscription apiName="foobar" apiVersion="1.0.0" environment="dev" tenantId="foo-bar" />
+    </application>
+    <application name="bar" tokenType="application" tokenValidity="1">
+        <subscription apiName="hello" apiVersion="1.0.0" environment="dev" tenantId="foo-bar" />
+        <subscription apiName="world" apiVersion="1.0.0" environment="dev" tenantId="foo-bar" />
+        <subscription apiName="foobar" apiVersion="1.0.0" environment="dev" tenantId="foo-bar" />
+    </application>
+</applications>
