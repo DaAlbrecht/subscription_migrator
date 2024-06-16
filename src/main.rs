@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use migrate::parse_xml_file;
+use migrate::{parse_xml_file, unify_applilcations, write_to_file, YamlApiSubscription};
 use std::path::PathBuf;
 
 mod migrate;
@@ -28,6 +28,8 @@ struct SingleArgs {
     input_dir: PathBuf,
     #[arg(long, short)]
     output_dir: PathBuf,
+    #[arg(long, short, default_value = "false")]
+    force: bool,
 }
 
 #[derive(Args)]
@@ -38,8 +40,10 @@ struct BulkArgs {
     name_prefix: String,
     #[arg(long, short, default_value = ".")]
     output_path: PathBuf,
-    #[arg(long, short, default_value = "All")]
+    #[arg(long, short)]
     environments: Environment,
+    #[arg(long, short, default_value = "false")]
+    force: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -50,41 +54,82 @@ enum Environment {
     Prod,
 }
 
-fn main() {
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Single(args) => {
-            let _ = migrate_single(args.input_dir.to_str().unwrap());
-        }
-        Commands::Bulk(args) => {
-            let _ = migrate_bulk(args.name_prefix.as_str());
-        }
+        Commands::Single(args) => migrate_single(args),
+        Commands::Bulk(args) => migrate_bulk(args),
     }
 }
 
-fn migrate_bulk(prefix: &str) -> Result<()> {
-    todo!()
+fn migrate_bulk(args: BulkArgs) -> Result<()> {
+    let directories = std::fs::read_dir(&args.path)?;
+    let matching_paths = directories
+        .into_iter()
+        .filter_map(|entry| {
+            let entry = entry.as_ref().unwrap();
+            let path = entry.path();
+            let is_matching = path.is_dir()
+                && path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with(&args.name_prefix);
+            if is_matching {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<PathBuf>>();
+
+    let mut staged_applications = Vec::new();
+    for mut path in matching_paths {
+        path = path.join("subscription.xml");
+        let file = std::fs::File::open(path)?;
+        let applications = parse_xml_file(&file)?;
+        staged_applications.extend(applications);
+    }
+    let yaml_applications = unify_applilcations(&staged_applications);
+    let files_written = write_to_file(&yaml_applications, args.output_path, args.force)?;
+    for file in files_written {
+        println!("File written: {:?}", file);
+    }
+
+    Ok(())
 }
 
-fn migrate_single(directory_name: &str) -> Result<()> {
-    let directory = PathBuf::from(directory_name);
+fn migrate_single(args: SingleArgs) -> Result<()> {
+    let directory = args.input_dir;
 
     if !directory.exists() {
         println!("Directory does not exist");
-        return Err(anyhow::anyhow!("Directory does not exist"));
+        return Err(anyhow::anyhow!("Directory {:?} does not exist", directory));
     }
 
-    let file = directory.join("subscription.xml");
+    let file_path = directory.join("subscription.xml");
 
-    if !file.exists() {
-        println!("File does not exist");
-        return Err(anyhow::anyhow!("File does not exist"));
+    if !file_path.exists() {
+        return Err(anyhow::anyhow!(
+            "subscription.xml does not exist in the directory {:?}",
+            directory
+        ));
     }
 
-    let content = std::fs::read_to_string(file)?;
-    println!("{}", content);
-    _ = parse_xml_file(content.as_str());
+    let file = std::fs::File::open(file_path)?;
+
+    let xml_applications = parse_xml_file(&file)?;
+    let yaml_applications = xml_applications
+        .into_iter()
+        .map(|app| app.into())
+        .collect::<Vec<YamlApiSubscription>>();
+
+    let files_written = write_to_file(&yaml_applications, args.output_dir, args.force)?;
+    for file in files_written {
+        println!("File written: {:?}", file);
+    }
 
     Ok(())
 }

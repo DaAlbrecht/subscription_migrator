@@ -2,7 +2,14 @@
 name = "subscription_migrator"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/DaAlbrecht/subscription_migrator"
+license = "MIT"
+description = "migrate wso2 subs"
+
 
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.7", features = ["derive"] }
+serde = { version = "1.0.203", features = ["serde_derive"] }
+serde_yaml = "0.9.34"
+xml-rs = "0.8.20"
