@@ -87,7 +87,7 @@ fn migrate_bulk(args: BulkArgs) -> Result<()> {
 
     let mut staged_applications = Vec::new();
     for mut path in matching_paths {
-        path = path.join("subscription.xml");
+        path = path.join("subscribe.xml");
         let file = std::fs::File::open(path)?;
         let applications = parse_xml_file(&file)?;
         staged_applications.extend(applications);
@@ -109,11 +109,11 @@ fn migrate_single(args: SingleArgs) -> Result<()> {
         return Err(anyhow::anyhow!("Directory {:?} does not exist", directory));
     }
 
-    let file_path = directory.join("subscription.xml");
+    let file_path = directory.join("subscribe.xml");
 
     if !file_path.exists() {
         return Err(anyhow::anyhow!(
-            "subscription.xml does not exist in the directory {:?}",
+            "subscribe.xml does not exist in the directory {:?}",
             directory
         ));
     }
