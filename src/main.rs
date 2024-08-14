@@ -54,16 +54,38 @@ enum Environment {
     Prod,
 }
 
+struct Config {
+    npr_plane_url: String,
+    prod_plane_url: String,
+}
+
 fn main() -> Result<()> {
+    let non_prod_plane_url = std::env::var("NPR_PLANE_URL");
+
+    let prod_plane_url = std::env::var("PROD_PLANE_URL");
+
+    if non_prod_plane_url.is_err() || prod_plane_url.is_err() {
+        return Err(anyhow::anyhow!(
+            "Environment variables NPR_PLANE_URL and PROD_PLANE_URL must be set"
+        ));
+    }
+
+    let non_prod_plane_url = non_prod_plane_url.unwrap();
+    let prod_plane_url = prod_plane_url.unwrap();
     let cli = Cli::parse();
 
+    let config = Config {
+        npr_plane_url: non_prod_plane_url,
+        prod_plane_url,
+    };
+
     match cli.command {
-        Commands::Single(args) => migrate_single(args),
-        Commands::Bulk(args) => migrate_bulk(args),
+        Commands::Single(args) => migrate_single(args, config),
+        Commands::Bulk(args) => migrate_bulk(args, config),
     }
 }
 
-fn migrate_bulk(args: BulkArgs) -> Result<()> {
+fn migrate_bulk(args: BulkArgs, config: Config) -> Result<()> {
     let directories = std::fs::read_dir(&args.path)?;
     let matching_paths = directories
         .into_iter()
@@ -92,7 +114,7 @@ fn migrate_bulk(args: BulkArgs) -> Result<()> {
         let applications = parse_xml_file(&file)?;
         staged_applications.extend(applications);
     }
-    let yaml_applications = unify_applilcations(&staged_applications);
+    let yaml_applications = unify_applilcations(&staged_applications, config);
     let files_written = write_to_file(&yaml_applications, args.output_path, args.force)?;
     for file in files_written {
         println!("File written: {:?}", file);
@@ -101,7 +123,7 @@ fn migrate_bulk(args: BulkArgs) -> Result<()> {
     Ok(())
 }
 
-fn migrate_single(args: SingleArgs) -> Result<()> {
+fn migrate_single(args: SingleArgs, config: Config) -> Result<()> {
     let directory = args.input_dir;
 
     if !directory.exists() {
@@ -123,7 +145,20 @@ fn migrate_single(args: SingleArgs) -> Result<()> {
     let xml_applications = parse_xml_file(&file)?;
     let yaml_applications = xml_applications
         .into_iter()
-        .map(|app| app.into())
+        .map(|app| {
+            let mut yaml_app: YamlApiSubscription = app.into();
+            for env in &mut yaml_app.environments {
+                match env.environments.iter().any(|e| e.name == "prod") {
+                    true => {
+                        env.control_plane_url = config.prod_plane_url.clone();
+                    }
+                    false => {
+                        env.control_plane_url = config.npr_plane_url.clone();
+                    }
+                }
+            }
+            yaml_app
+        })
         .collect::<Vec<YamlApiSubscription>>();
 
     let files_written = write_to_file(&yaml_applications, args.output_dir, args.force)?;

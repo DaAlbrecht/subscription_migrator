@@ -8,6 +8,8 @@ use anyhow::Result;
 use serde::Serialize;
 use xml::{reader::XmlEvent, EventReader};
 
+use crate::Config;
+
 #[derive(Debug, Default, Clone)]
 pub(crate) struct XmlApplication {
     name: String,
@@ -27,22 +29,22 @@ pub(crate) struct XmlSubscription {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct YamlApiSubscription {
-    environments: Vec<YamlEnvironment>,
+    pub environments: Vec<YamlEnvironment>,
     #[serde(rename = "subscriptions")]
     subscription: YamlSubscription,
 }
 
 #[derive(Debug, Serialize)]
-struct YamlEnvironment {
+pub(crate) struct YamlEnvironment {
     #[serde(rename = "controlPlaneUrl")]
-    control_plane_url: String,
+    pub control_plane_url: String,
     #[serde(rename = "environment")]
-    environments: Vec<YamlEnvironmentName>,
+    pub environments: Vec<YamlEnvironmentName>,
 }
 
 #[derive(Debug, Serialize)]
-struct YamlEnvironmentName {
-    name: String,
+pub(crate) struct YamlEnvironmentName {
+    pub name: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -62,9 +64,6 @@ struct YamlApi {
     name: String,
     version: String,
 }
-
-const PROD_PLANE_URL: &str = "https://prod.control-plane.com";
-const NON_PROD_PLANE_URL: &str = "https://non-prod.control-plane.com";
 
 impl From<XmlApplication> for YamlApiSubscription {
     fn from(app: XmlApplication) -> Self {
@@ -93,12 +92,12 @@ impl From<XmlApplication> for YamlApiSubscription {
             .map(|env| YamlEnvironmentName { name: env.clone() });
 
         let yaml_env_non_prod = YamlEnvironment {
-            control_plane_url: NON_PROD_PLANE_URL.to_string(),
+            control_plane_url: "".to_string(),
             environments: yaml_non_prod_names.collect(),
         };
 
         let yaml_env_prod = YamlEnvironment {
-            control_plane_url: PROD_PLANE_URL.to_string(),
+            control_plane_url: "".to_string(),
             environments: yaml_prod_names,
         };
 
@@ -238,7 +237,10 @@ pub fn write_to_file(
     Ok(files_written)
 }
 
-pub fn unify_applilcations(applications: &[XmlApplication]) -> Vec<YamlApiSubscription> {
+pub fn unify_applilcations(
+    applications: &[XmlApplication],
+    config: Config,
+) -> Vec<YamlApiSubscription> {
     let mut app_map = HashMap::new();
 
     for app in applications {
@@ -314,12 +316,12 @@ pub fn unify_applilcations(applications: &[XmlApplication]) -> Vec<YamlApiSubscr
             .map(|env| YamlEnvironmentName { name: env.clone() });
 
         let yaml_env_non_prod = YamlEnvironment {
-            control_plane_url: NON_PROD_PLANE_URL.to_string(),
+            control_plane_url: config.npr_plane_url.clone(),
             environments: yaml_non_prod_names.collect(),
         };
 
         let yaml_env_prod = YamlEnvironment {
-            control_plane_url: PROD_PLANE_URL.to_string(),
+            control_plane_url: config.prod_plane_url.clone(),
             environments: yaml_prod_names.collect(),
         };
 
