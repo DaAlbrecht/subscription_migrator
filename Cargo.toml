@@ -1,6 +1,6 @@
 [package]
 name = "subscription_migrator"
-version = "0.1.1-beta"
+version = "0.1.2"
 edition = "2021"
 repository = "https://github.com/DaAlbrecht/subscription_migrator"
 license = "MIT"

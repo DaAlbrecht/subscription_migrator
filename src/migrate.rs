@@ -16,8 +16,8 @@ pub(crate) struct XmlApplication {
     ///Maybe not needed
     token_type: String,
     apis: Vec<XmlSubscription>,
-    ///TODO
-    token_validity: i32,
+    token_validity: Option<i32>,
+    refresh_token_validity: Option<i32>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -57,6 +57,10 @@ struct YamlApplication {
     name: String,
     description: String,
     apis: Vec<YamlApi>,
+    #[serde(rename = "accessTokenTTL")]
+    access_token_ttl: Option<i32>,
+    #[serde(rename = "refreshTokenTTL")]
+    refresh_token_ttl: Option<i32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -108,6 +112,9 @@ impl From<XmlApplication> for YamlApiSubscription {
             environments.push(yaml_env_prod);
         }
 
+        let access_token_ttl = app.token_validity;
+        let refresh_token_ttl = app.refresh_token_validity;
+
         let apis = app
             .apis
             .iter()
@@ -123,6 +130,8 @@ impl From<XmlApplication> for YamlApiSubscription {
             name: app.name,
             description,
             apis,
+            access_token_ttl,
+            refresh_token_ttl,
         };
 
         let subscription = YamlSubscription { application: app };
@@ -173,13 +182,16 @@ pub(crate) fn parse_xml_file(file: impl Read) -> Result<Vec<XmlApplication>> {
 fn parse_application(attributes: &[xml::attribute::OwnedAttribute]) -> XmlApplication {
     let mut name = String::new();
     let mut token_type = String::new();
-    let mut token_validity = 0;
+    let mut token_validity = None;
+    let mut refresh_token_validity = None;
 
     for attr in attributes {
         match attr.name.local_name.as_str() {
             "name" => name.clone_from(&attr.value),
             "tokenType" => token_type.clone_from(&attr.value),
-            "tokenValidity" => token_validity = attr.value.parse().unwrap(),
+            "tokenValidity" => token_validity = Some(attr.value.parse().unwrap()),
+            "userTokenValidity" => token_validity = Some(attr.value.parse().unwrap()),
+            "refreshTokenValidity" => refresh_token_validity = Some(attr.value.parse().unwrap()),
             _ => {}
         }
     }
@@ -189,6 +201,7 @@ fn parse_application(attributes: &[xml::attribute::OwnedAttribute]) -> XmlApplic
         token_type,
         apis: Vec::new(),
         token_validity,
+        refresh_token_validity,
     }
 }
 
@@ -239,7 +252,7 @@ pub fn write_to_file(
 
 pub fn unify_applilcations(
     applications: &[XmlApplication],
-    config: Config,
+    config: &Config,
 ) -> Vec<YamlApiSubscription> {
     let mut app_map = HashMap::new();
 
@@ -250,6 +263,7 @@ pub fn unify_applilcations(
                 name: app.name.clone(),
                 token_type: app.token_type.clone(),
                 token_validity: app.token_validity,
+                refresh_token_validity: app.refresh_token_validity,
                 apis: Vec::new(),
             })
             .apis
@@ -287,6 +301,8 @@ pub fn unify_applilcations(
             name: app.name.clone(),
             description: format!("{}-subscription", app.name),
             apis: yaml_apis,
+            access_token_ttl: app.token_validity,
+            refresh_token_ttl: app.refresh_token_validity,
         };
 
         let yaml_sub = YamlSubscription {

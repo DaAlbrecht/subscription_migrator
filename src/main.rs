@@ -8,7 +8,9 @@ mod migrate;
 #[derive(Parser)]
 #[command(name = "Migrator")]
 #[command(version = "1.0")]
-#[command(about = "migrate subscription from xml to yaml", long_about = None)]
+#[command(
+    about = "migrate subscription from xml to yaml, requires NPR_PLANE_URL and PROD_PLANE_URL environment variables"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -60,6 +62,8 @@ struct Config {
 }
 
 fn main() -> Result<()> {
+    let cli = Cli::parse();
+
     let non_prod_plane_url = std::env::var("NPR_PLANE_URL");
 
     let prod_plane_url = std::env::var("PROD_PLANE_URL");
@@ -72,20 +76,18 @@ fn main() -> Result<()> {
 
     let non_prod_plane_url = non_prod_plane_url.unwrap();
     let prod_plane_url = prod_plane_url.unwrap();
-    let cli = Cli::parse();
-
     let config = Config {
         npr_plane_url: non_prod_plane_url,
         prod_plane_url,
     };
 
     match cli.command {
-        Commands::Single(args) => migrate_single(args, config),
-        Commands::Bulk(args) => migrate_bulk(args, config),
+        Commands::Single(args) => migrate_single(args, &config),
+        Commands::Bulk(args) => migrate_bulk(args, &config),
     }
 }
 
-fn migrate_bulk(args: BulkArgs, config: Config) -> Result<()> {
+fn migrate_bulk(args: BulkArgs, config: &Config) -> Result<()> {
     let directories = std::fs::read_dir(&args.path)?;
     let matching_paths = directories
         .into_iter()
@@ -123,7 +125,7 @@ fn migrate_bulk(args: BulkArgs, config: Config) -> Result<()> {
     Ok(())
 }
 
-fn migrate_single(args: SingleArgs, config: Config) -> Result<()> {
+fn migrate_single(args: SingleArgs, config: &Config) -> Result<()> {
     let directory = args.input_dir;
 
     if !directory.exists() {
@@ -150,10 +152,10 @@ fn migrate_single(args: SingleArgs, config: Config) -> Result<()> {
             for env in &mut yaml_app.environments {
                 match env.environments.iter().any(|e| e.name == "prod") {
                     true => {
-                        env.control_plane_url = config.prod_plane_url.clone();
+                        env.control_plane_url = config.prod_plane_url.to_string();
                     }
                     false => {
-                        env.control_plane_url = config.npr_plane_url.clone();
+                        env.control_plane_url = config.npr_plane_url.to_string();
                     }
                 }
             }
