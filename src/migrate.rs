@@ -58,8 +58,10 @@ struct YamlApplication {
     description: String,
     apis: Vec<YamlApi>,
     #[serde(rename = "accessTokenTTL")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     access_token_ttl: Option<i32>,
     #[serde(rename = "refreshTokenTTL")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     refresh_token_ttl: Option<i32>,
 }
 
