@@ -8,7 +8,7 @@ use anyhow::Result;
 use serde::Serialize;
 use xml::{reader::XmlEvent, EventReader};
 
-use crate::Config;
+use crate::{BulkArgs, Config, SingleArgs};
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct XmlApplication {
@@ -143,6 +143,89 @@ impl From<XmlApplication> for YamlApiSubscription {
             subscription,
         }
     }
+}
+
+pub(crate) fn migrate_subscription(args: SingleArgs, config: &Config) -> Result<()> {
+    let directory = args.input_dir;
+
+    if !directory.exists() {
+        println!("Directory does not exist");
+        return Err(anyhow::anyhow!("Directory {:?} does not exist", directory));
+    }
+    let file_path = directory.join("subscribe.xml");
+
+    if !file_path.exists() {
+        return Err(anyhow::anyhow!(
+            "subscribe.xml does not exist in the directory {:?}",
+            directory
+        ));
+    }
+
+    let file = std::fs::File::open(file_path)?;
+
+    let xml_applications = parse_xml_file(&file)?;
+    let yaml_applications = xml_applications
+        .into_iter()
+        .map(|app| {
+            let mut yaml_app: YamlApiSubscription = app.into();
+            for env in &mut yaml_app.environments {
+                match env.environments.iter().any(|e| e.name == "prod") {
+                    true => {
+                        env.control_plane_url = config.prod_plane_url.to_string();
+                    }
+                    false => {
+                        env.control_plane_url = config.npr_plane_url.to_string();
+                    }
+                }
+            }
+            yaml_app
+        })
+        .collect::<Vec<YamlApiSubscription>>();
+
+    let files_written = write_to_file(&yaml_applications, args.output_dir, args.force)?;
+    for file in files_written {
+        println!("File written: {:?}", file);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn migrate_subscription_bulk(args: BulkArgs, config: &Config) -> Result<()> {
+    let directories = std::fs::read_dir(&args.path)?;
+    let matching_paths = directories
+        .into_iter()
+        .filter_map(|entry| {
+            let entry = entry.as_ref().unwrap();
+            let path = entry.path();
+            let is_matching = path.is_dir()
+                && path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with(&args.name_prefix);
+            if is_matching {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<PathBuf>>();
+
+    let mut staged_applications = Vec::new();
+    for mut path in matching_paths {
+        path = path.join("subscribe.xml");
+        let file = std::fs::File::open(path)?;
+        let applications = parse_xml_file(&file)?;
+        staged_applications.extend(applications);
+    }
+    let yaml_applications = unify_applilcations(&staged_applications, config);
+    let files_written = write_to_file(&yaml_applications, args.output_path, args.force)?;
+    for file in files_written {
+        println!("File written: {:?}", file);
+    }
+
+    Ok(())
 }
 
 pub(crate) fn parse_xml_file(file: impl Read) -> Result<Vec<XmlApplication>> {
