@@ -11,7 +11,7 @@ use xml::{reader::XmlEvent, EventReader};
 use crate::{BulkArgs, Config, SingleArgs};
 
 #[derive(Debug, Default, Clone)]
-pub(crate) struct XmlApplication {
+pub struct XmlApplication {
     name: String,
     ///Maybe not needed
     token_type: String,
@@ -21,21 +21,21 @@ pub(crate) struct XmlApplication {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub(crate) struct XmlSubscription {
+pub struct XmlSubscription {
     api_name: String,
     api_version: String,
     env: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct YamlApiSubscription {
+pub struct YamlApiSubscription {
     pub environments: Vec<YamlEnvironment>,
     #[serde(rename = "subscriptions")]
     subscription: YamlSubscription,
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct YamlEnvironment {
+pub struct YamlEnvironment {
     #[serde(rename = "controlPlaneUrl")]
     pub control_plane_url: String,
     #[serde(rename = "environment")]
@@ -43,7 +43,7 @@ pub(crate) struct YamlEnvironment {
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct YamlEnvironmentName {
+pub struct YamlEnvironmentName {
     pub name: String,
 }
 
@@ -145,7 +145,7 @@ impl From<XmlApplication> for YamlApiSubscription {
     }
 }
 
-pub(crate) fn migrate_subscription(args: SingleArgs, config: &Config) -> Result<()> {
+pub fn migrate_subscription(args: SingleArgs, config: &Config) -> Result<()> {
     let directory = args.input_dir;
 
     if !directory.exists() {
@@ -190,7 +190,7 @@ pub(crate) fn migrate_subscription(args: SingleArgs, config: &Config) -> Result<
     Ok(())
 }
 
-pub(crate) fn migrate_subscription_bulk(args: BulkArgs, config: &Config) -> Result<()> {
+pub fn migrate_subscription_bulk(args: BulkArgs, config: &Config) -> Result<()> {
     let directories = std::fs::read_dir(&args.path)?;
     let matching_paths = directories
         .into_iter()
@@ -228,7 +228,7 @@ pub(crate) fn migrate_subscription_bulk(args: BulkArgs, config: &Config) -> Resu
     Ok(())
 }
 
-pub(crate) fn parse_xml_file(file: impl Read) -> Result<Vec<XmlApplication>> {
+pub fn parse_xml_file(file: impl Read) -> Result<Vec<XmlApplication>> {
     let parser = EventReader::new(file);
     let mut app = XmlApplication::default();
     let mut applications = Vec::new();

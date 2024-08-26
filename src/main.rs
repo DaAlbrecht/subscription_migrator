@@ -77,18 +77,13 @@ struct Config {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let non_prod_plane_url = std::env::var("NPR_PLANE_URL");
+    let non_prod_plane_url = std::env::var("NPR_PLANE_URL").unwrap_or("changeme".to_string());
 
-    let prod_plane_url = std::env::var("PROD_PLANE_URL");
+    let prod_plane_url = std::env::var("PROD_PLANE_URL").unwrap_or("changeme".to_string());
 
-    if non_prod_plane_url.is_err() || prod_plane_url.is_err() {
-        return Err(anyhow::anyhow!(
-            "Environment variables NPR_PLANE_URL and PROD_PLANE_URL must be set"
-        ));
-    }
+    let non_prod_plane_url = non_prod_plane_url;
+    let prod_plane_url = prod_plane_url;
 
-    let non_prod_plane_url = non_prod_plane_url.unwrap();
-    let prod_plane_url = prod_plane_url.unwrap();
     let config = Config {
         npr_plane_url: non_prod_plane_url,
         prod_plane_url,
